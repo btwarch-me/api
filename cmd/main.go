@@ -4,6 +4,7 @@ import (
 	"btwarch/config"
 	"btwarch/database"
 	"btwarch/routes/auth"
+	"btwarch/middleware" 
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -38,6 +39,7 @@ func main() {
 	})
 
 	app.Use(logger.New())
+	app.Use(middleware.LinuxOnlyMiddleware())
 
 	auth.InitRouter(app)
 
