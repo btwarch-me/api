@@ -16,7 +16,7 @@ import (
 type AuthHandler struct {
 	config         *config.Config
 	githubService  *services.GitHubService
-	jwtService     *services.JWTService
+	authService    *services.AuthService
 	userRepository *repositories.UserRepository
 }
 
@@ -26,13 +26,18 @@ func NewAuthHandler(config *config.Config) *AuthHandler {
 		config.GitHubClientSecret,
 		config.GitHubRedirectURL,
 	)
-	jwtService := services.NewJWTService(config.JWTSecret)
+	authService := services.NewAuthService(
+		config.JWTSecret,
+		config.CookieDomain,
+		config.CookieSecure,
+		config.CookieSameSite,
+	)
 	userRepository := repositories.NewUserRepository()
 
 	return &AuthHandler{
 		config:         config,
 		githubService:  githubService,
-		jwtService:     jwtService,
+		authService:    authService,
 		userRepository: userRepository,
 	}
 }
@@ -106,11 +111,10 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 		user = existingUser
 	}
 
-	jwtToken, err := h.jwtService.GenerateToken(user.ID.String(), user.Username)
-	if err != nil {
-		log.Printf("Error generating JWT: %v", err)
+	if err := h.authService.SetAuthCookie(c, user.ID.String(), user.Username); err != nil {
+		log.Printf("Error setting auth cookie: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate authentication token",
+			"error": "Failed to set authentication cookie",
 		})
 	}
 
@@ -122,7 +126,33 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 			"email":    user.Email,
 			"avatar":   user.AvatarURL,
 		},
-		"token": jwtToken,
+	})
+}
+
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	h.authService.ClearAuthCookie(c)
+
+	return c.JSON(fiber.Map{
+		"message": "Logout successful",
+	})
+}
+
+func (h *AuthHandler) CheckAuth(c *fiber.Ctx) error {
+	userID := c.Locals("user_id")
+	username := c.Locals("username")
+
+	if userID == nil || username == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"authenticated": true,
+		"user": fiber.Map{
+			"id":       userID,
+			"username": username,
+		},
 	})
 }
 
