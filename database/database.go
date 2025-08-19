@@ -37,7 +37,6 @@ var DB *sql.DB
 func Connect(databaseURL string) error {
 	var err error
 	DB, err = sql.Open("postgres", databaseURL)
-	fmt.Println("databaseURL", databaseURL)
 	if err != nil {
 		return fmt.Errorf("error opening database: %v", err)
 	}
