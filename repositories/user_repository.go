@@ -76,3 +76,25 @@ func (r *UserRepository) UpdateUserTokens(userID string, accessToken string) err
 
 	return nil
 }
+
+func (r *UserRepository) InsertUser(user database.User) (int64, error) {
+	res, err := r.db.Exec(
+		`INSERT INTO users (github_id, username, email, avatar_url, access_token)
+         VALUES ($1, $2, $3, $4, $5)`,
+		user.GitHubID, user.Username, user.Email, user.AvatarURL, user.AccessToken,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert user: %v", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return 0, fmt.Errorf("no user was inserted")
+	}
+
+	return rowsAffected, nil
+}

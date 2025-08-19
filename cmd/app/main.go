@@ -3,8 +3,8 @@ package main
 import (
 	"btwarch/config"
 	"btwarch/database"
-	"btwarch/routes/auth"
-	"btwarch/middleware" 
+	"btwarch/middleware"
+	"btwarch/routes"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -41,7 +41,8 @@ func main() {
 	app.Use(logger.New())
 	app.Use(middleware.LinuxOnlyMiddleware())
 
-	auth.InitRouter(app)
+	routes.InitAuthRouter(app)
+	routes.InitRecordRouter(app)
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	log.Fatal(app.Listen(":" + cfg.Port))

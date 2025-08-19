@@ -1,4 +1,4 @@
-package auth
+package routes
 
 import (
 	"btwarch/config"
@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func InitRouter(app *fiber.App) {
+func InitAuthRouter(app *fiber.App) {
 	config := config.LoadConfig()
 	authHandler := handlers.NewAuthHandler(config)
 

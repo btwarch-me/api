@@ -12,27 +12,27 @@ BINARY_MAC := $(BINARY_NAME)_mac
 
 LDFLAGS := -ldflags="-s -w"
 
-.PHONY: deps build build-linux build-windows build-mac build-all run clean db-up db-down db-logs
+.PHONY: deps build build-linux build-windows build-mac build-all run clean db-up db-down db-logs migrate migrate-status
 
 deps:
 	$(GOGET) -v ./...
 
 build:
-	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) -v ./cmd/main.go
+	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) -v ./cmd/app/main.go
 
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_UNIX) -v ./cmd/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_UNIX) -v ./cmd/app/main.go
 
 build-windows:
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_WIN) -v ./cmd/main.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_WIN) -v ./cmd/app/main.go
 
 build-mac:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_MAC) -v ./cmd/main.go
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BINARY_MAC) -v ./cmd/app/main.go
 
 build-all: build-linux build-windows build-mac
 
 run:
-	$(GOCMD) run cmd/main.go
+	$(GOCMD) run cmd/app/main.go
 
 db-up:
 	docker-compose up -d postgres
@@ -42,6 +42,12 @@ db-down:
 
 db-logs:
 	docker-compose logs -f postgres
+
+migrate:
+	$(GOCMD) run cmd/migrate/main.go
+
+migrate-status:
+	$(GOCMD) run cmd/migrate/main.go status
 
 clean:
 	$(GOCLEAN)
