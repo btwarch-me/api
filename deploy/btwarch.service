@@ -6,8 +6,8 @@ After=network.target
 Type=simple
 User=ubuntu
 Group=ubuntu
-WorkingDirectory=/home/ubuntu/btwarch/app/
-ExecStart=/home/ubuntu/btwarch/app/btwarch_linux_amd64
+WorkingDirectory=/home/ubuntu/btwarch   
+ExecStart=/home/ubuntu/btwarch/btwarch_linux_amd64
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -17,8 +17,7 @@ SyslogIdentifier=btwarch
 Environment=GIN_MODE=release
 Environment=PORT=8080
 NoNewPrivileges=true
-PrivateTmp=true
-ReadWritePaths=/home/ubuntu/btwarch/app/logs
+ReadWritePaths=/home/ubuntu/btwarch/logs
 
 [Install]
 WantedBy=multi-user.target
