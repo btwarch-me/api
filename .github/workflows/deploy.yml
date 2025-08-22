@@ -51,11 +51,15 @@ jobs:
           EOF
 
           DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          ssh $SSH_USER@$SSH_HOST 'mkdir -p ~/btwarch/app/backups'
+          ssh $SSH_USER@$SSH_HOST 'mkdir -p ~/btwarch/app/backups ~/btwarch/migrations'
           ssh $SSH_USER@$SSH_HOST "if [ -f ~/btwarch/app/${{ env.BINARY_NAME }}_linux_amd64 ]; then cp ~/btwarch/app/${{ env.BINARY_NAME }}_linux_amd64 ~/btwarch/app/backups/${{ env.BINARY_NAME }}_linux_amd64.backup.$DEPLOY_TIMESTAMP; fi"
 
+          # Copy binary
           scp ${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/app/
           ssh $SSH_USER@$SSH_HOST "chmod +x ~/btwarch/app/${{ env.BINARY_NAME }}_linux_amd64"
+
+          # Copy migrations
+          scp -r database/migrations/* $SSH_USER@$SSH_HOST:~/btwarch/migrations/
 
           ssh $SSH_USER@$SSH_HOST 'sudo systemctl restart btwarch'
 
