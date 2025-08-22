@@ -47,6 +47,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "sudo systemctl stop btwarch || true"
 
           scp -i ~/.ssh/deploy_key ${{ env.BINARY_NAME }} $SSH_USER@$SSH_HOST:~/btwarch
+          scp -i ~/.ssh/deploy_key database/migrations $SSH_USER@$SSH_HOST:~/database/migrations
 
           ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "chmod +x ~/btwarch && sudo systemctl start btwarch"
 
