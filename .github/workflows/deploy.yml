@@ -11,11 +11,10 @@ env:
   BINARY_NAME: btwarch
 
 jobs:
-  build-artifacts:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      short-sha: ${{ steps.version.outputs.short-sha }}
+    if: github.ref == 'refs/heads/main'
+    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,41 +25,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Generate version
-        id: version
-        run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
-          VERSION="v1.0.0-${SHORT_SHA}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "short-sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-
       - name: Build binary
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            -o ${{ env.BINARY_NAME }}_linux_amd64 \
+            -ldflags="-s -w" \
+            -o ${{ env.BINARY_NAME }} \
             ./cmd/app/main.go
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-${{ steps.version.outputs.short-sha }}
-          path: ${{ env.BINARY_NAME }}_linux_amd64
-          retention-days: 30
-
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: [build-artifacts]
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-${{ needs.build-artifacts.outputs.short-sha }}
 
       - name: Setup SSH
         run: |
@@ -69,226 +39,20 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.REMOTE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Pre-deployment checks
+      - name: Deploy to server
         env:
           SSH_HOST: ${{ secrets.REMOTE_HOST }}
           SSH_USER: ${{ secrets.REMOTE_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "echo 'SSH connection successful'"
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "sudo systemctl stop btwarch || true"
 
-          DISK_USAGE=$(ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "df -h / | awk 'NR==2 {print \$5}' | sed 's/%//'")
-          if [ "$DISK_USAGE" -gt 90 ]; then
-            echo "Disk usage is $DISK_USAGE%. Aborting deployment."
-            exit 1
-          fi
-          echo "Disk usage check passed ($DISK_USAGE%)"
+          scp -i ~/.ssh/deploy_key ${{ env.BINARY_NAME }} $SSH_USER@$SSH_HOST:~/btwarch
 
-      - name: Create deployment directory structure
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            mkdir -p ~/btwarch/{current,releases,shared/{logs,database/migrations},backups}
-            
-            chmod 755 ~/btwarch ~/btwarch/current ~/btwarch/releases ~/btwarch/shared
-            
-            RELEASE_DIR="releases/$(date +%Y%m%d_%H%M%S)"
-            mkdir -p ~/btwarch/$RELEASE_DIR
-            echo $RELEASE_DIR > ~/btwarch/latest_release
-          ENDSSH
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "chmod +x ~/btwarch && sudo systemctl start btwarch"
 
-      - name: Deploy application
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-          VERSION: ${{ needs.build-artifacts.outputs.version }}
-        run: |
-          RELEASE_DIR=$(ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "cat ~/btwarch/latest_release")
-
-          scp -i ~/.ssh/deploy_key ${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/$RELEASE_DIR/
-
-          if [ -d "database/migrations" ]; then
-            scp -r -i ~/.ssh/deploy_key database/migrations/* $SSH_USER@$SSH_HOST:~/btwarch/shared/database/migrations/
-          fi
-
-      - name: Prepare release
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-          VERSION: ${{ needs.build-artifacts.outputs.version }}
-        run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            RELEASE_DIR=$(cat ~/btwarch/latest_release)
-            cd ~/btwarch/$RELEASE_DIR
-            
-            chmod +x btwarch_linux_amd64
-            
-            ln -sf ../../shared/logs logs
-            ln -sf ../../shared/database database
-            
-            echo "Release prepared in $RELEASE_DIR"
-          ENDSSH
-
-      - name: Health check before deployment
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            if systemctl is-active --quiet btwarch; then
-              echo "Current service is running"
-              if curl -sf --max-time 10 http://localhost:8080/health; then
-                echo "Current service health check passed"
-              else
-                echo "Current service health check failed, but proceeding with deployment"
-              fi
-            else
-              echo "No current service running"
-            fi
-          ENDSSH
-
-      - name: Deploy new release
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            RELEASE_DIR=$(cat ~/btwarch/latest_release)
-            
-            if [ -L ~/btwarch/current ]; then
-              CURRENT_RELEASE=$(readlink ~/btwarch/current)
-              echo "Backing up current release: $CURRENT_RELEASE"
-              echo $CURRENT_RELEASE > ~/btwarch/previous_release
-            fi
-            
-            if systemctl is-active --quiet btwarch; then
-              echo "Stopping btwarch service..."
-              sudo systemctl stop btwarch
-              
-              for i in {1..30}; do
-                if ! systemctl is-active --quiet btwarch; then
-                  echo "Service stopped successfully"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "Service didn't stop gracefully, forcing stop"
-                  sudo systemctl kill btwarch
-                fi
-                sleep 1
-              done
-            fi
-            
-            ln -sfn $RELEASE_DIR ~/btwarch/current
-            
-            echo "Starting btwarch service..."
-            sudo systemctl start btwarch
-            
-            echo "Deployment completed"
-          ENDSSH
-
-      - name: Post-deployment health check
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            echo "Waiting for service to start..."
-            for i in {1..60}; do
-              if systemctl is-active --quiet btwarch; then
-                echo "Service is active"
-                break
-              fi
-              if [ $i -eq 60 ]; then
-                echo "Service failed to start"
-                sudo journalctl -u btwarch -n 20 --no-pager
-                exit 1
-              fi
-              sleep 1
-            done
-            
-            echo "Performing health checks..."
-            for i in {1..12}; do
-              if curl -sf --max-time 10 http://localhost:8080/health; then
-                echo "Health check passed"
-                curl -s http://localhost:8080/version || echo "Version endpoint not available"
-                break
-              fi
-              if [ $i -eq 12 ]; then
-                echo "Health check failed after 12 attempts"
-                sudo journalctl -u btwarch -n 30 --no-pager
-                exit 1
-              fi
-              echo "Health check attempt $i failed, retrying in 5 seconds..."
-              sleep 5
-            done
-          ENDSSH
-
-      - name: Rollback on failure
-        if: failure()
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-        run: |
-          echo "Deployment failed, initiating rollback..."
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            if [ -f ~/btwarch/previous_release ]; then
-              PREVIOUS_RELEASE=$(cat ~/btwarch/previous_release)
-              echo "Rolling back to: $PREVIOUS_RELEASE"
-              
-              sudo systemctl stop btwarch || true
-              ln -sfn $PREVIOUS_RELEASE ~/btwarch/current
-              sudo systemctl start btwarch
-              
-              sleep 10
-              if curl -sf --max-time 10 http://localhost:8080/health; then
-                echo "Rollback successful"
-              else
-                echo "Rollback failed"
-                sudo journalctl -u btwarch -n 20 --no-pager
-              fi
-            else
-              echo "No previous release found for rollback"
-            fi
-          ENDSSH
-
-      - name: Clean up old releases
-        if: success()
-        env:
-          SSH_HOST: ${{ secrets.REMOTE_HOST }}
-          SSH_USER: ${{ secrets.REMOTE_USER }}
-        run: |
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            cd ~/btwarch/releases
-            ls -t | tail -n +6 | xargs -r rm -rf
-            echo "Cleaned up old releases"
-          ENDSSH
+          sleep 5
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "curl -sf http://localhost:8080/health || echo 'Health check failed'"
 
       - name: Cleanup SSH
         if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key
-
-      - name: Deployment notification
-        if: always()
-        env:
-          VERSION: ${{ needs.build-artifacts.outputs.version }}
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "Deployment of $VERSION completed successfully!"
-            echo "Deployment URL: https://api.btwarch.me/"
-          else
-            echo "Deployment of $VERSION failed!"
-            echo "Check the logs above for details."
-          fi
-
-  cleanup:
-    runs-on: ubuntu-latest
-    needs: [deploy-production]
-    if: always() && github.ref == 'refs/heads/main'
-    steps:
-      - name: Clean up artifacts
-        uses: geekyeggo/delete-artifact@v4
-        with:
-          name: binary-${{ needs.build-artifacts.outputs.short-sha }}
-        continue-on-error: true
+        run: rm -f ~/.ssh/deploy_key
