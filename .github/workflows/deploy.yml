@@ -1,0 +1,108 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  GO_VERSION: "1.24.4"
+  BINARY_NAME: btwarch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build binary
+        run: |
+          make build-linux
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.BINARY_NAME }}_linux_amd64
+          path: bin/${{ env.BINARY_NAME }}_linux_amd64
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.BINARY_NAME }}_linux_amd64
+          path: bin/
+
+      - name: Make binary executable
+        run: chmod +x bin/${{ env.BINARY_NAME }}_linux_amd64
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "Host $SSH_HOST" > ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Create backup
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh $SSH_USER@$SSH_HOST 'mkdir -p ~/btwarch/app/backups'
+          ssh $SSH_USER@$SSH_HOST 'cp ~/btwarch/app/btwarch_linux_amd64 ~/btwarch/app/backups/btwarch_linux_amd64.backup.$(date +%Y%m%d_%H%M%S)' || true
+
+      - name: Deploy binary
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          rsync -avz --progress bin/${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/app/
+          ssh $SSH_USER@$SSH_HOST 'chmod +x ~/btwarch/app/btwarch_linux_amd64'
+
+      - name: Restart services
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh $SSH_USER@$SSH_HOST 'sudo systemctl restart btwarch'
+          ssh $SSH_USER@$SSH_HOST 'sudo systemctl reload nginx'
+
+      - name: Verify deployment
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh $SSH_USER@$SSH_HOST 'systemctl is-active btwarch'
+          ssh $SSH_USER@$SSH_HOST 'systemctl is-active nginx'
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -f ~/.ssh/config

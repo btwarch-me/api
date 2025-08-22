@@ -1,5 +1,5 @@
 [Unit]
-Description=btwarch api service
+Description=btwarch service
 After=network.target
 
 [Service]
@@ -12,7 +12,7 @@ Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=btwarch-api
+SyslogIdentifier=btwarch
 
 Environment=GIN_MODE=release
 Environment=PORT=8080

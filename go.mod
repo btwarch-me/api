@@ -1,6 +1,6 @@
 module btwarch
 
-go 1.24.6
+go 1.24.4
 
 require (
 	github.com/cloudflare/cloudflare-go/v4 v4.6.0
