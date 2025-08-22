@@ -3,8 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+
   workflow_dispatch:
 
 env:
@@ -117,7 +116,7 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.REMOTE_HOST }}
           SSH_USER: ${{ secrets.REMOTE_USER }}
-          VERSION: ${{ needs.test-and-build.outputs.version }}
+          VERSION: ${{ needs.build-artifacts.outputs.version }}
         run: |
           ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
             RELEASE_DIR=$(cat ~/btwarch/latest_release)
