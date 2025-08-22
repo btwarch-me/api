@@ -18,8 +18,6 @@ Environment=GIN_MODE=release
 Environment=PORT=8080
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
 ReadWritePaths=/home/ubuntu/btwarch/app/logs
 
 [Install]
