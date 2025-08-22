@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type JWTService struct {
-	secretKey []byte
+type AuthService struct {
+	secretKey      []byte
+	cookieDomain   string
+	cookieSecure   bool
+	cookieSameSite string
 }
 
 type Claims struct {
@@ -17,11 +21,16 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJWTService(secretKey string) *JWTService {
-	return &JWTService{secretKey: []byte(secretKey)}
+func NewAuthService(secretKey string, cookieDomain string, cookieSecure bool, cookieSameSite string) *AuthService {
+	return &AuthService{
+		secretKey:      []byte(secretKey),
+		cookieDomain:   cookieDomain,
+		cookieSecure:   cookieSecure,
+		cookieSameSite: cookieSameSite,
+	}
 }
 
-func (j *JWTService) GenerateToken(userID string, username string) (string, error) {
+func (a *AuthService) GenerateToken(userID string, username string) (string, error) {
 	claims := &Claims{
 		UserID:   userID,
 		Username: username,
@@ -33,15 +42,15 @@ func (j *JWTService) GenerateToken(userID string, username string) (string, erro
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(j.secretKey)
+	return token.SignedString(a.secretKey)
 }
 
-func (j *JWTService) ValidateToken(tokenString string) (*Claims, error) {
+func (a *AuthService) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return j.secretKey, nil
+		return a.secretKey, nil
 	})
 
 	if err != nil {
@@ -53,4 +62,44 @@ func (j *JWTService) ValidateToken(tokenString string) (*Claims, error) {
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+func (a *AuthService) SetAuthCookie(c *fiber.Ctx, userID string, username string) error {
+	token, err := a.GenerateToken(userID, username)
+	if err != nil {
+		return err
+	}
+
+	cookie := new(fiber.Cookie)
+	cookie.Name = "auth_token"
+	cookie.Value = token
+	cookie.Expires = time.Now().Add(24 * time.Hour)
+	cookie.HTTPOnly = true
+	cookie.Secure = a.cookieSecure
+	cookie.SameSite = a.cookieSameSite
+	cookie.Path = "/"
+
+	if a.cookieDomain != "" {
+		cookie.Domain = a.cookieDomain
+	}
+
+	c.Cookie(cookie)
+	return nil
+}
+
+func (a *AuthService) ClearAuthCookie(c *fiber.Ctx) {
+	cookie := new(fiber.Cookie)
+	cookie.Name = "auth_token"
+	cookie.Value = ""
+	cookie.Expires = time.Now().Add(-1 * time.Hour) // Expire immediately
+	cookie.HTTPOnly = true
+	cookie.Secure = a.cookieSecure
+	cookie.SameSite = a.cookieSameSite
+	cookie.Path = "/"
+
+	if a.cookieDomain != "" {
+		cookie.Domain = a.cookieDomain
+	}
+
+	c.Cookie(cookie)
 }
