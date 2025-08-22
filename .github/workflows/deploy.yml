@@ -1,7 +1,10 @@
-name: Deploy to AWS
+name: CI/CD Pipeline
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
   workflow_dispatch:
@@ -11,7 +14,7 @@ env:
   BINARY_NAME: btwarch
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     environment: production
@@ -27,17 +30,16 @@ jobs:
       - name: Build binary
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w" \
+            -ldflags="-s -w -X main.version=${{ github.sha }}" \
             -o ${{ env.BINARY_NAME }}_linux_amd64 \
             ./cmd/app/main.go
 
-      - name: Configure SSH and Deploy
+      - name: Deploy to EC2
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
-          # Setup SSH
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
@@ -48,21 +50,26 @@ jobs:
             UserKnownHostsFile=/dev/null
           EOF
 
-          # Ensure target directory exists and create backup
+          DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           ssh $SSH_USER@$SSH_HOST 'mkdir -p ~/btwarch/app/backups'
-          ssh $SSH_USER@$SSH_HOST 'if [ -f ~/btwarch/app/btwarch_linux_amd64 ]; then cp ~/btwarch/app/btwarch_linux_amd64 ~/btwarch/app/backups/btwarch_linux_amd64.backup.$(date +%Y%m%d_%H%M%S); fi'
+          ssh $SSH_USER@$SSH_HOST "if [ -f ~/btwarch/app/${{ env.BINARY_NAME }}_linux_amd64 ]; then cp ~/btwarch/app/${{ env.BINARY_NAME }}_linux_amd64 ~/btwarch/app/backups/${{ env.BINARY_NAME }}_linux_amd64.backup.$DEPLOY_TIMESTAMP; fi"
 
-          # Deploy new binary
           scp ${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/app/
-          ssh $SSH_USER@$SSH_HOST 'chmod +x ~/btwarch/app/btwarch_linux_amd64'
+          ssh $SSH_USER@$SSH_HOST "chmod +x ~/btwarch/app/${{ env.BINARY_NAME }}_linux_amd64"
 
-          # Restart services
           ssh $SSH_USER@$SSH_HOST 'sudo systemctl restart btwarch'
-          ssh $SSH_USER@$SSH_HOST 'sudo systemctl reload nginx'
 
-          # Verify services are running
-          ssh $SSH_USER@$SSH_HOST 'systemctl is-active --quiet btwarch || (echo "btwarch service failed to start" && exit 1)'
-          ssh $SSH_USER@$SSH_HOST 'systemctl is-active --quiet nginx || (echo "nginx service failed to start" && exit 1)'
+          sleep 5
+          ssh $SSH_USER@$SSH_HOST 'systemctl is-active --quiet btwarch || (echo "Service failed to start" && exit 1)'
+          ssh $SSH_USER@$SSH_HOST 'curl -f http://localhost:8080/health || (echo "Health check failed" && exit 1)'
 
-          # Cleanup
           rm -f ~/.ssh/deploy_key ~/.ssh/config
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful to ${{ secrets.SSH_HOST }}"
+          else
+            echo "❌ Deployment failed to ${{ secrets.SSH_HOST }}"
+          fi
