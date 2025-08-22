@@ -1,0 +1,12 @@
+name: Healthcheck
+
+on:
+  workflow_dispatch:
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Healthcheck
+        run: |
+          curl -s http://api.btwarch.me/health | grep -q "OK"
