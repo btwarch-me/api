@@ -31,7 +31,10 @@ jobs:
 
       - name: Build binary
         run: |
-          make build-linux
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-s -w" \
+            -o bin/${{ env.BINARY_NAME }}_linux_amd64 \
+            ./cmd/app/main.go
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
