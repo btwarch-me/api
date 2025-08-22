@@ -16,12 +16,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Build binary
         run: |
@@ -36,19 +37,32 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
+          # Setup SSH
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "Host $SSH_HOST" > ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          cat > ~/.ssh/config <<EOF
+          Host $SSH_HOST
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+          EOF
 
+          # Ensure target directory exists and create backup
           ssh $SSH_USER@$SSH_HOST 'mkdir -p ~/btwarch/app/backups'
-          ssh $SSH_USER@$SSH_HOST 'cp ~/btwarch/app/btwarch_linux_amd64 ~/btwarch/app/backups/btwarch_linux_amd64.backup.$(date +%Y%m%d_%H%M%S)' || true
+          ssh $SSH_USER@$SSH_HOST 'if [ -f ~/btwarch/app/btwarch_linux_amd64 ]; then cp ~/btwarch/app/btwarch_linux_amd64 ~/btwarch/app/backups/btwarch_linux_amd64.backup.$(date +%Y%m%d_%H%M%S); fi'
 
-          rsync -avz --progress ${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/app/
+          # Deploy new binary
+          scp ${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/app/
           ssh $SSH_USER@$SSH_HOST 'chmod +x ~/btwarch/app/btwarch_linux_amd64'
-          ssh $SSH_USER@$SSH_HOST 'sudo systemctl restart btwarch && sudo systemctl reload nginx'
-          ssh $SSH_USER@$SSH_HOST 'systemctl is-active btwarch && systemctl is-active nginx'
 
+          # Restart services
+          ssh $SSH_USER@$SSH_HOST 'sudo systemctl restart btwarch'
+          ssh $SSH_USER@$SSH_HOST 'sudo systemctl reload nginx'
+
+          # Verify services are running
+          ssh $SSH_USER@$SSH_HOST 'systemctl is-active --quiet btwarch || (echo "btwarch service failed to start" && exit 1)'
+          ssh $SSH_USER@$SSH_HOST 'systemctl is-active --quiet nginx || (echo "nginx service failed to start" && exit 1)'
+
+          # Cleanup
           rm -f ~/.ssh/deploy_key ~/.ssh/config
