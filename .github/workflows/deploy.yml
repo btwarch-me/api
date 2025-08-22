@@ -51,27 +51,58 @@ jobs:
           EOF
 
           DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          ssh $SSH_USER@$SSH_HOST 'mkdir -p ~/btwarch/backups ~/btwarch/database/migrations'
-          ssh $SSH_USER@$SSH_HOST "if [ -f ~/btwarch/${{ env.BINARY_NAME }}_linux_amd64 ]; then cp ~/btwarch/${{ env.BINARY_NAME }}_linux_amd64 ~/btwarch/backups/${{ env.BINARY_NAME }}_linux_amd64.backup.$DEPLOY_TIMESTAMP; fi"
+          ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
+            mkdir -p ~/btwarch/{backups,database/migrations}
+            chmod 755 ~/btwarch ~/btwarch
+          ENDSSH
+
+          ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
+            if [ -f ~/btwarch/btwarch_linux_amd64 ]; then
+              cp ~/btwarch/btwarch_linux_amd64 ~/btwarch/backups/btwarch_linux_amd64.backup.$DEPLOY_TIMESTAMP
+            fi
+          ENDSSH
 
           scp ${{ env.BINARY_NAME }}_linux_amd64 $SSH_USER@$SSH_HOST:~/btwarch/
-          ssh $SSH_USER@$SSH_HOST "chmod +x ~/btwarch/${{ env.BINARY_NAME }}_linux_amd64"
+          ssh $SSH_USER@$SSH_HOST "chmod +x ~/btwarch/btwarch_linux_amd64"
 
-          scp -r database/migrations/* $SSH_USER@$SSH_HOST:~/btwarch/database/migrations/
+          if [ -d "database/migrations" ]; then
+            scp -r database/migrations/* $SSH_USER@$SSH_HOST:~/btwarch/database/migrations/
+          fi
 
-          ssh $SSH_USER@$SSH_HOST 'sudo systemctl stop btwarch || true'
+          ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
+            sudo systemctl stop btwarch || true
+            sleep 5
 
-          sleep 10
-          ssh $SSH_USER@$SSH_HOST 'sudo systemctl start btwarch'
+            sudo systemctl start btwarch
+            sleep 5
 
-          sleep 10
+            if ! sudo systemctl is-active --quiet btwarch; then
+              echo "Service failed to start. Checking logs..."
+              sudo journalctl -u btwarch -n 50 --no-pager
+              exit 1
+            fi
 
-          ssh $SSH_USER@$SSH_HOST 'systemctl status btwarch || true'
-          ssh $SSH_USER@$SSH_HOST 'curl -f http://localhost:8080/health || true'
+            for i in {1..6}; do
+              if curl -sf http://localhost:8080/health; then
+                echo "Health check passed"
+                break
+              fi
+              if [ $i -eq 6 ]; then
+                echo "Health check failed after multiple attempts"
+                exit 1
+              fi
+              echo "Waiting for service to be ready..."
+              sleep 5
+            done
+          ENDSSH
 
           rm -f ~/.ssh/deploy_key ~/.ssh/config
 
       - name: Notify deployment status
         if: always()
         run: |
-          echo "Deployment completed. Check logs for details."
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Deployment completed successfully"
+          else
+            echo "❌ Deployment failed"
+          fi
