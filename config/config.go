@@ -16,6 +16,9 @@ type Config struct {
 	CookieDomain       string
 	CookieSecure       bool
 	CookieSameSite     string
+	CloudinaryCloudName string
+	CloudinaryApiKey   string
+	CloudinaryApiSecret string
 }
 
 func LoadConfig() *Config {
@@ -31,6 +34,9 @@ func LoadConfig() *Config {
 		CookieDomain:       getEnv("COOKIE_DOMAIN", ""),
 		CookieSecure:       getEnvBool("COOKIE_SECURE", false),
 		CookieSameSite:     getEnv("COOKIE_SAME_SITE", "lax"),
+		CloudinaryCloudName: getEnv("CLOUDINARY_CLOUD_NAME",""),
+		CloudinaryApiKey:   getEnv("CLOUDINARY_API_KEY",""),
+		CloudinaryApiSecret: getEnv("CLOUDINARY_API_SECRET",""),
 	}
 }
 
