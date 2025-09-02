@@ -46,12 +46,25 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "sudo systemctl stop btwarch || true"
 
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "mkdir -p ~/btwarch"
+          if ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "[ -d ~/btwarch ]"; then
+            echo "Directory exists, updating files..."
+          else
+            echo "Directory doesn't exist, creating new installation..."
+            ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "mkdir -p ~/btwarch"
+          fi
+
           scp -i ~/.ssh/deploy_key ${{ env.BINARY_NAME }} $SSH_USER@$SSH_HOST:~/btwarch/
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "mkdir -p ~/btwarch/database/migrations"
+
+          if ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "[ -d ~/btwarch/database/migrations ]"; then
+            echo "Migrations directory exists, updating files..."
+          else
+            echo "Migrations directory doesn't exist, creating..."
+            ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "mkdir -p ~/btwarch/database/migrations"
+          fi
+
           scp -r -i ~/.ssh/deploy_key database/migrations/* $SSH_USER@$SSH_HOST:~/btwarch/database/migrations/
 
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "chmod +x ~/btwarch && sudo systemctl start btwarch"
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "chmod +x ~/btwarch/btwarch && sudo systemctl start btwarch"
 
           sleep 5
           ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST "curl -sf http://localhost:8080/health || echo 'Health check failed'"

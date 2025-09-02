@@ -1,11 +1,17 @@
 name: Healthcheck
 
 on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   healthcheck:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Healthcheck
         run: |
