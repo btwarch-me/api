@@ -21,15 +21,16 @@ type User struct {
 }
 
 type Record struct {
-	ID          uuid.UUID `json:"id"`
-	UserId      uuid.UUID `json:"user_id"`
-	DomainName  string    `json:"domain_name"`
-	RecordType  string    `json:"record_type"`
-	RecordValue string    `json:"record_value"`
-	TTL         int       `json:"ttl"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   string    `json:"created_at"`
-	UpdatedAt   string    `json:"updated_at"`
+	ID                 uuid.UUID `json:"id"`
+	UserId             uuid.UUID `json:"user_id"`
+	RecordName         string    `json:"record_name"`
+	RecordType         string    `json:"record_type"`
+	RecordValue        string    `json:"record_value"`
+	TTL                int       `json:"ttl"`
+	IsActive           bool      `json:"is_active"`
+	CloudflareRecordID *string   `json:"cloudflare_record_id"`
+	CreatedAt          string    `json:"created_at"`
+	UpdatedAt          string    `json:"updated_at"`
 }
 
 type Meme struct {

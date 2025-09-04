@@ -15,4 +15,4 @@ jobs:
     steps:
       - name: Healthcheck
         run: |
-          curl -s http://api.btwarch.me/health | grep -q "OK"
+          curl -s https://api.btwarch.me/health | grep -q "healthy"

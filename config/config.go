@@ -8,16 +8,22 @@ type Config struct {
 	GitHubClientID     string
 	GitHubClientSecret string
 	GitHubRedirectURL  string
+
 	CloudFlareZoneId   string
-	CloudFlareToken    string
-	JWTSecret          string
-	DatabaseURL        string
-	Port               string
-	CookieDomain       string
-	CookieSecure       bool
-	CookieSameSite     string
+	CloudFlareApiToken string
+
+	JWTSecret string
+
+	DatabaseURL string
+
+	Port string
+
+	CookieDomain   string
+	CookieSecure   bool
+	CookieSameSite string
+
 	CloudinaryCloudName string
-	CloudinaryApiKey   string
+	CloudinaryApiKey    string
 	CloudinaryApiSecret string
 }
 
@@ -26,17 +32,23 @@ func LoadConfig() *Config {
 		GitHubClientID:     getEnv("GITHUB_CLIENT_ID", ""),
 		GitHubClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
 		GitHubRedirectURL:  getEnv("GITHUB_REDIRECT_URL", "http://localhost:8080/auth/github/callback"),
+
 		CloudFlareZoneId:   getEnv("CLOUDFLARE_ZONE_ID", ""),
-		CloudFlareToken:    getEnv("CLOUDFLARE_TOKEN", ""),
-		JWTSecret:          getEnv("JWT_SECRET", ""),
-		DatabaseURL:        getEnv("DATABASE_URL", "postgres://btwarch:btwarch@localhost:5432/btwarch?sslmode=disable"),
-		Port:               getEnv("PORT", "8080"),
-		CookieDomain:       getEnv("COOKIE_DOMAIN", ""),
-		CookieSecure:       getEnvBool("COOKIE_SECURE", false),
-		CookieSameSite:     getEnv("COOKIE_SAME_SITE", "lax"),
-		CloudinaryCloudName: getEnv("CLOUDINARY_CLOUD_NAME",""),
-		CloudinaryApiKey:   getEnv("CLOUDINARY_API_KEY",""),
-		CloudinaryApiSecret: getEnv("CLOUDINARY_API_SECRET",""),
+		CloudFlareApiToken: getEnv("CLOUDFLARE_API_TOKEN", ""),
+
+		JWTSecret: getEnv("JWT_SECRET", ""),
+
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://btwarch:btwarch@localhost:5432/btwarch?sslmode=disable"),
+
+		Port: getEnv("PORT", "8080"),
+
+		CookieDomain:   getEnv("COOKIE_DOMAIN", ""),
+		CookieSecure:   getEnvBool("COOKIE_SECURE", false),
+		CookieSameSite: getEnv("COOKIE_SAME_SITE", "lax"),
+
+		CloudinaryCloudName: getEnv("CLOUDINARY_CLOUD_NAME", ""),
+		CloudinaryApiKey:    getEnv("CLOUDINARY_API_KEY", ""),
+		CloudinaryApiSecret: getEnv("CLOUDINARY_API_SECRET", ""),
 	}
 }
 
