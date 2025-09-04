@@ -189,6 +189,16 @@ func (r *RecordRepository) GetRecordByName(domainName string) (*database.Record,
 	return record, nil
 }
 
+func (r *RecordRepository) RecordExists(domainName string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM records WHERE record_name = $1)`
+	var exists bool
+	err := r.db.QueryRow(query, domainName).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("error checking record: %v", err)
+	}
+	return exists, nil
+}
+
 func (r *RecordRepository) UpdateRecordStatus(recordID uuid.UUID, isActive bool) error {
 	query := `
 		UPDATE records 

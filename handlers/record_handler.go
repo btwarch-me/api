@@ -166,6 +166,31 @@ func (h *RecordHandler) UpdateRecord(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
+func (h *RecordHandler) CheckAvailability(c *fiber.Ctx) error {
+	var body struct {
+		RecordName string `json:"record_name"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+
+	if body.RecordName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "record_name is required"})
+	}
+
+	record, err := h.recordRepo.RecordExists(body.RecordName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	available := !record
+
+	return c.JSON(fiber.Map{
+		"available": available,
+	})
+}
+
 func (h *RecordHandler) DeleteRecord(c *fiber.Ctx) error {
 	userIDVal := c.Locals("user_id")
 	userIDStr, ok := userIDVal.(string)
