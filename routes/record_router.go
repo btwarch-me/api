@@ -29,4 +29,7 @@ func InitRecordRouter(app *fiber.App) {
 	recordGroup.Get("/:id", recordHandler.GetRecord)
 	recordGroup.Put("/:id", recordHandler.UpdateRecord)
 	recordGroup.Delete("/:id", recordHandler.DeleteRecord)
+
+	recordGroup.Post("/checkavailability", recordHandler.CheckAvailability)
+
 }
