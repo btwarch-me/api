@@ -12,7 +12,10 @@ import (
 
 func InitRecordRouter(app *fiber.App) {
 	config := config.LoadConfig()
-	recordHandler := handlers.NewRecordHandler(repositories.NewRecordRepository())
+	recordHandler := handlers.NewRecordHandler(
+		repositories.NewRecordRepository(),
+		repositories.NewSubdomainClaimRepository(),
+	)
 	authService := services.NewAuthService(
 		config.JWTSecret,
 		config.CookieDomain,
@@ -25,7 +28,9 @@ func InitRecordRouter(app *fiber.App) {
 	recordGroup.Use(middleware.AuthMiddleware(authService))
 
 	recordGroup.Post("/", recordHandler.CreateRecord)
+	recordGroup.Post("/claim", recordHandler.ClaimRecord)
 	recordGroup.Get("/", recordHandler.GetRecords)
+	recordGroup.Get("/claim", recordHandler.GetSubdomainClaim)
 	recordGroup.Get("/:id", recordHandler.GetRecord)
 	recordGroup.Put("/:id", recordHandler.UpdateRecord)
 	recordGroup.Delete("/:id", recordHandler.DeleteRecord)

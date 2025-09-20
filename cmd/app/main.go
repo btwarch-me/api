@@ -3,7 +3,7 @@ package main
 import (
 	"btwarch/config"
 	"btwarch/database"
-	// "btwarch/middleware"/
+	"btwarch/middleware"
 	"btwarch/routes"
 	"log"
 
@@ -39,6 +39,7 @@ func main() {
 	})
 
 	app.Use(logger.New())
+	app.Use(middleware.CorsMiddleware(cfg))
 	// app.Use(middleware.LinuxOnlyMiddleware())
 
 	routes.InitAuthRouter(app)

@@ -25,6 +25,7 @@ func AuthMiddleware(authService *services.AuthService) fiber.Handler {
 
 		c.Locals("user_id", claims.UserID)
 		c.Locals("username", claims.Username)
+		c.Locals("avatar_url", claims.AvatarURL)
 
 		return c.Next()
 	}

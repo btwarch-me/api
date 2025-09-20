@@ -16,8 +16,9 @@ type AuthService struct {
 }
 
 type Claims struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	AvatarURL string `json:"avatar_url"`
 	jwt.RegisteredClaims
 }
 
@@ -30,10 +31,11 @@ func NewAuthService(secretKey string, cookieDomain string, cookieSecure bool, co
 	}
 }
 
-func (a *AuthService) GenerateToken(userID string, username string) (string, error) {
+func (a *AuthService) GenerateToken(userID string, username string, avatarURL string) (string, error) {
 	claims := &Claims{
-		UserID:   userID,
-		Username: username,
+		UserID:    userID,
+		Username:  username,
+		AvatarURL: avatarURL,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -64,8 +66,8 @@ func (a *AuthService) ValidateToken(tokenString string) (*Claims, error) {
 	return nil, fmt.Errorf("invalid token")
 }
 
-func (a *AuthService) SetAuthCookie(c *fiber.Ctx, userID string, username string) error {
-	token, err := a.GenerateToken(userID, username)
+func (a *AuthService) SetAuthCookie(c *fiber.Ctx, userID string, username string, avatarURL string) error {
+	token, err := a.GenerateToken(userID, username, avatarURL)
 	if err != nil {
 		return err
 	}

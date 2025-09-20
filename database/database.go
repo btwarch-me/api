@@ -33,14 +33,12 @@ type Record struct {
 	UpdatedAt          string    `json:"updated_at"`
 }
 
-type Meme struct {
-	ID          uuid.UUID `json:"id"`
-	UserId      uuid.UUID `json:"user_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Images      []string  `json:"images"`
-	CreatedAt   string    `json:"created_at"`
-	UpdatedAt   string    `json:"updated_at"`
+type SubdomainClaim struct {
+	ID            uuid.UUID `json:"id"`
+	UserId        uuid.UUID `json:"user_id"`
+	SubdomainName string    `json:"subdomain_name"`
+	CreatedAt     string    `json:"created_at"`
+	UpdatedAt     string    `json:"updated_at"`
 }
 
 var DB *sql.DB

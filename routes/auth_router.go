@@ -24,5 +24,5 @@ func InitAuthRouter(app *fiber.App) {
 	authGroup.Get("/github", authHandler.InitiateGitHubAuth)
 	authGroup.Get("/github/callback", authHandler.GitHubCallback)
 	authGroup.Post("/logout", authHandler.Logout)
-	authGroup.Get("/check", middleware.AuthMiddleware(authService), authHandler.CheckAuth)
+	authGroup.Get("/me", middleware.AuthMiddleware(authService), authHandler.CheckAuth)
 }

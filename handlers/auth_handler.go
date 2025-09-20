@@ -111,7 +111,7 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 		user = existingUser
 	}
 
-	if err := h.authService.SetAuthCookie(c, user.ID.String(), user.Username); err != nil {
+	if err := h.authService.SetAuthCookie(c, user.ID.String(), user.Username, user.AvatarURL); err != nil {
 		log.Printf("Error setting auth cookie: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to set authentication cookie",
@@ -121,10 +121,10 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Authentication successful",
 		"user": fiber.Map{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"avatar":   user.AvatarURL,
+			"id":         user.ID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"avatar_url": user.AvatarURL,
 		},
 	})
 }
@@ -140,8 +140,8 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 func (h *AuthHandler) CheckAuth(c *fiber.Ctx) error {
 	userID := c.Locals("user_id")
 	username := c.Locals("username")
-
-	if userID == nil || username == nil {
+	avatar := c.Locals("avatar_url")
+	if userID == nil || username == nil || avatar == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Not authenticated",
 		})
@@ -150,8 +150,9 @@ func (h *AuthHandler) CheckAuth(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"authenticated": true,
 		"user": fiber.Map{
-			"id":       userID,
-			"username": username,
+			"id":         userID,
+			"username":   username,
+			"avatar_url": avatar,
 		},
 	})
 }

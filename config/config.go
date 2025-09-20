@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -22,9 +23,23 @@ type Config struct {
 	CookieSecure   bool
 	CookieSameSite string
 
-	CloudinaryCloudName string
-	CloudinaryApiKey    string
-	CloudinaryApiSecret string
+	ParentDomain string
+
+	CORSOrigins []string
+}
+
+func getEnvArray(key string, defaultValue []string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	values := strings.Split(value, ",")
+	for i := range values {
+		values[i] = strings.TrimSpace(values[i])
+	}
+
+	return values
 }
 
 func LoadConfig() *Config {
@@ -46,9 +61,9 @@ func LoadConfig() *Config {
 		CookieSecure:   getEnvBool("COOKIE_SECURE", false),
 		CookieSameSite: getEnv("COOKIE_SAME_SITE", "lax"),
 
-		CloudinaryCloudName: getEnv("CLOUDINARY_CLOUD_NAME", ""),
-		CloudinaryApiKey:    getEnv("CLOUDINARY_API_KEY", ""),
-		CloudinaryApiSecret: getEnv("CLOUDINARY_API_SECRET", ""),
+		ParentDomain: getEnv("PARENT_DOMAIN", "btwarch.me"),
+
+		CORSOrigins: getEnvArray("CORS_ORIGINS", []string{}),
 	}
 }
 
