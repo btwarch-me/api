@@ -24,7 +24,7 @@ func NewRecordHandler(recordRepo *repositories.RecordRepository, subdomainClaimR
 	}
 }
 
-func (h *RecordHandler) ClaimRecord(c *fiber.Ctx) error {
+func (h *RecordHandler) ClaimSubdomain(c *fiber.Ctx) error {
 	userIDVal := c.Locals("user_id")
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
@@ -75,6 +75,37 @@ func (h *RecordHandler) ClaimRecord(c *fiber.Ctx) error {
 		"message":     "subdomain claimed successfully",
 		"claim":       claim,
 		"full_domain": utils.GetFullSubdomainName(body.SubdomainName),
+	})
+}
+
+func (h *RecordHandler) DeleteSubdomain(c *fiber.Ctx) error {
+	userIDVal := c.Locals("user_id")
+	userIDStr, ok := userIDVal.(string)
+	if !ok || userIDStr == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user id"})
+	}
+
+	claim, err := h.subdomainClaimRepo.GetClaimByUserID(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if claim == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no subdomain claim found"})
+	}
+
+	if err := h.subdomainClaimRepo.DeleteClaim(claim.ID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "subdomain claim deleted successfully",
+		"claim":   claim,
 	})
 }
 
