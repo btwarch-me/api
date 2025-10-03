@@ -118,15 +118,16 @@ func (h *AuthHandler) GitHubCallback(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Authentication successful",
-		"user": fiber.Map{
-			"id":         user.ID,
-			"username":   user.Username,
-			"email":      user.Email,
-			"avatar_url": user.AvatarURL,
-		},
-	})
+	return c.Redirect("https://dns.btwarch.me/", http.StatusSeeOther)
+	// return c.JSON(fiber.Map{
+	// 	"message": "Authentication successful",
+	// 	"user": fiber.Map{
+	// 		"id":         user.ID,
+	// 		"username":   user.Username,
+	// 		"email":      user.Email,
+	// 		"avatar_url": user.AvatarURL,
+	// 	},
+	// })
 }
 
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
