@@ -197,7 +197,14 @@ func (h *RecordHandler) GetRecords(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(records)
+	if records == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no records found"})
+	}
+
+	return c.JSON(fiber.Map{
+		"records": records,
+		"message": "records fetched successfully",
+	})
 }
 
 func (h *RecordHandler) GetRecord(c *fiber.Ctx) error {

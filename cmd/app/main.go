@@ -46,5 +46,5 @@ func main() {
 	routes.InitRecordRouter(app)
 
 	log.Printf("Server starting on port %s", cfg.Port)
-	log.Fatal(app.Listen(":" + cfg.Port))
+	log.Fatal(app.Listen("0.0.0.0:" + cfg.Port))
 }
