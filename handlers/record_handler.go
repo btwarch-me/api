@@ -191,13 +191,17 @@ func (h *RecordHandler) CreateRecord(c *fiber.Ctx) error {
 			}
 			_, err := h.recordRepo.UpdateOnCloudflare(*existingRecord.CloudflareRecordID, cfRecord)
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": utils.ExtractErrorMessage(err),
+				})
 			}
 		}
 
 		updatedRecord, err := h.recordRepo.GetRecordByID(existingRecord.ID)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": utils.ExtractErrorMessage(err),
+			})
 		}
 
 		return c.Status(fiber.StatusOK).JSON(updatedRecord)
